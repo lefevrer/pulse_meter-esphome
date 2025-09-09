@@ -38,8 +38,6 @@ void PulseMeterSensor::setup() {
 }
 
 void PulseMeterSensor::loop() {
-  // Reset the count in get before we pass it back to the ISR as set
-  this->get_->count_ = 0;
 
   {
     // Lock the interrupt so the interrupt code doesn't interfere with itself
@@ -58,8 +56,9 @@ void PulseMeterSensor::loop() {
     }
     this->last_pin_val_ = current;
 
-    // Swap out set and get to get the latest state from the ISR
-    std::swap(this->set_, this->get_);
+    // Copy set into get to get the latest state from the ISR and reset the count in set
+    *this->get_ = *this->set_;
+    this->set_->count_ = 0;
   }
 
   const uint32_t now = micros();
