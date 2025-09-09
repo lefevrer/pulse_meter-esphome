@@ -57,7 +57,9 @@ void PulseMeterSensor::loop() {
     this->last_pin_val_ = current;
 
     // Copy set into get to get the latest state from the ISR and reset the count in set
-    *this->get_ = *this->set_;
+    this->get_->last_detected_edge_us_ = this->set_->last_detected_edge_us_;
+    this->get_->last_rising_edge_us_ = this->set_->last_rising_edge_us_;
+    this->get_->count_ = this->set_->count_;
     this->set_->count_ = 0;
   }
 
