@@ -56,9 +56,9 @@ class PulseMeterSensor : public sensor::Sensor, public Component {
     uint32_t count_ = 0;
 
     void copy_from(const volatile State& other) {
-        last_detected_edge_us_ = other.last_detected_edge_us_;
-        last_rising_edge_us_ = other.last_rising_edge_us_;
-        count_ = other.count_;
+        this->last_detected_edge_us_ = other.last_detected_edge_us_;
+        this->last_rising_edge_us_ = other.last_rising_edge_us_;
+        this->count_ = other.count_;
     }
   };
   State state_[2];
