@@ -39,6 +39,8 @@ void PulseMeterSensor::setup() {
 
 void PulseMeterSensor::loop() {
 
+  const uint32_t now;
+
   {
     // Lock the interrupt so the interrupt code doesn't interfere with itself
     InterruptLock lock;
@@ -56,25 +58,16 @@ void PulseMeterSensor::loop() {
     }
     this->last_pin_val_ = current;
 
+    now = micros();
+
+    //Force the detection of any undected edge
+    if(this->filter_mode_ == FILTER_PULSE) {
+      this->pulse_state_.update(now);
+    }
+
     // Copy set into get to get the latest state from the ISR and reset the count in set
     this->get_->copy_from(*this->set_);
     this->set_->count_ = 0;
-  }
-
-  const uint32_t now = micros();
-
-  // If an edge was peeked, repay the debt
-  if (this->peeked_edge_ && this->get_->count_ > 0) {
-    this->peeked_edge_ = false;
-    this->get_->count_--;  // NOLINT(clang-diagnostic-deprecated-volatile)
-  }
-
-  // If there is an unprocessed edge, and filter_us_ has passed since, count this edge early
-  if (this->get_->last_rising_edge_us_ != this->get_->last_detected_edge_us_ &&
-      now - this->get_->last_rising_edge_us_ >= this->filter_us_) {
-    this->peeked_edge_ = true;
-    this->get_->last_detected_edge_us_ = this->get_->last_rising_edge_us_;
-    this->get_->count_++;  // NOLINT(clang-diagnostic-deprecated-volatile)
   }
 
   // Check if we detected a pulse this loop
@@ -164,16 +157,8 @@ void IRAM_ATTR PulseMeterSensor::pulse_intr(PulseMeterSensor *sensor) {
   auto &state = sensor->pulse_state_;
   auto &set = *sensor->set_;
 
-  // Filter length has passed since the last interrupt
-  const bool length = now - state.last_intr_ >= sensor->filter_us_;
-
-  if (length && state.latched_ && !sensor->last_pin_val_) {  // Long enough low edge
-    state.latched_ = false;
-  } else if (length && !state.latched_ && sensor->last_pin_val_) {  // Long enough high edge
-    state.latched_ = true;
-    set.last_detected_edge_us_ = state.last_intr_;
-    set.count_++;  // NOLINT(clang-diagnostic-deprecated-volatile)
-  }
+  // Force the detection of any undected edge
+  sensor->pulse_update(now);
 
   // Due to order of operations this includes
   //    length && latched && rising   (just reset from a long low edge)
@@ -182,6 +167,24 @@ void IRAM_ATTR PulseMeterSensor::pulse_intr(PulseMeterSensor *sensor) {
 
   state.last_intr_ = now;
   sensor->last_pin_val_ = pin_val;
+}
+
+void PulseMeterSensor::pulse_update(uint32_t time) {
+  // This method detects any undected edge since the last call
+  // Should be call during an interrupt or the interrupt should be locked before so the interrupt code cannot't interfere
+  auto &state = this.pulse_state_;
+  auto &set = *this.set_;
+  
+  // Filter length has passed since the last interrupt
+  const bool length = time - state.last_intr_ >= this.filter_us_;
+
+  if (length && state.latched_ && !this.last_pin_val_) {  // Long enough low edge
+    state.latched_ = false;
+  } else if (length && !state.latched_ && this.last_pin_val_) {  // Long enough high edge
+    state.latched_ = true;
+    set.last_detected_edge_us_ = state.last_intr_;
+    set.count_++;  // NOLINT(clang-diagnostic-deprecated-volatile)
+  }
 }
 
 }  // namespace pulse_meter
