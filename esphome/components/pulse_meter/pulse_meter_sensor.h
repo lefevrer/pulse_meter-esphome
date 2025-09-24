@@ -34,6 +34,8 @@ class PulseMeterSensor : public sensor::Sensor, public Component {
   static void edge_intr(PulseMeterSensor *sensor);
   static void pulse_intr(PulseMeterSensor *sensor);
 
+  void pulse_update(uint32_t timeout);
+
   InternalGPIOPin *pin_{nullptr};
   uint32_t filter_us_ = 0;
   uint32_t timeout_us_ = 1000000UL * 60UL * 5UL;
